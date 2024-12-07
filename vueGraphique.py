@@ -1,24 +1,27 @@
 import tkinter as tk
 from tkinter import Canvas
 from scipy.interpolate import splprep, splev
+from scipy.ndimage import label
 import numpy as np
 from PIL import Image, ImageTk, ImageDraw
+import matplotlib.pyplot as plt
 
 class VueGrapique():
     """
     Classe qui permet à l'utilisateur de dessiner son chemin.
     """
 
-    def __init__(self, width=800, height=500, epaisseur_chemin=30):
+    def __init__(self, width=512, height=512, epaisseur_chemin=5, nb_texture=8):
         """
         Constructeur de la classe.
         """
         self.width = width
         self.height = height
         self.epaisseur_chemin = epaisseur_chemin
+        self.nb_texture = nb_texture
 
         self.points = []
-        self.masque = np.zeros((self.height, self.width), dtype=np.uint8)
+        self.masque = np.zeros((self.height * nb_texture, self.width * nb_texture), dtype=np.uint8)
 
         # Initialisation de la fenêtre principale
         self.root = tk.Tk()
@@ -96,6 +99,9 @@ class VueGrapique():
         self.reset_button.destroy()
         self.validate_button.destroy()
 
+        # Désactiver le clic gauche
+        self.canvas.unbind("<Button-1>")
+
         # Afficher le masque pour validation
         self.afficher_masque()
 
@@ -122,7 +128,11 @@ class VueGrapique():
             )
         
         # Convertir l'image PIL en masque numpy
-        self.masque[:] = np.array(mask_image) // 255
+        chemin_masque = np.array(mask_image) // 255
+
+        # Redimensionner le masque pour le masque de textures
+        masque_redim = Image.fromarray(chemin_masque).resize((self.width * self.nb_texture, self.height * self.nb_texture), Image.NEAREST)
+        self.masque = np.array(masque_redim)
 
 
     def afficher_masque(self):
@@ -155,7 +165,6 @@ class VueGrapique():
         self.root.quit()
 
 
-
     def tracer_chemin(self):
         """
         Lance l'interface graphique pour tracer le chemin.
@@ -164,6 +173,57 @@ class VueGrapique():
         self.root.mainloop()
         return self.masque
 
+
+    def charger_masque_textures(self, file_path):
+        """
+        Charge un masque de textures à partir d'un fichier.
+        """
+        # Charger l'image en niveaux de gris
+        image = Image.open(file_path).convert("L")
+
+        # Redimensionner l'image
+        image = image.resize((self.width, self.height), Image.NEAREST)
+
+        # Convertir l'image en masque binaire
+        masque = np.array(image) // 255
+
+        # Créer un masque de textures
+        masque_textures = np.zeros((self.height * self.nb_texture, self.width * self.nb_texture), dtype=np.uint8)
+
+        # Remplir le masque de textures
+        for i in range(self.nb_texture):
+            for j in range(self.nb_texture):
+                masque_textures[i*self.height:(i+1)*self.height, j*self.width:(j+1)*self.width] = masque
+        
+        # # Test de l'affichage avec matplotlib
+        # plt.imshow(masque_textures, cmap='gray')
+        # plt.show()
+
+        return masque_textures
+        
+
+    def appliquer_masque_textures(self, masque_textures):
+        """
+        Applique le masque de textures sur le masque du chemin.
+        """
+        
+
+# Exemple d'utilisation
 vue = VueGrapique()
-test = vue.tracer_chemin()
-print(test)
+masque = vue.tracer_chemin()
+masque_textures = vue.charger_masque_textures("./Textures/texture3_masque.png")
+# masque_combine = masque * masque_textures
+labeled_mask, num_labels = label(masque_textures)
+masque_final = np.zeros_like(masque_textures)
+
+for label_id in range(1, num_labels + 1):
+    indices_zone = np.where(labeled_mask == label_id)
+    for i,j in zip(*indices_zone):
+        if masque[i,j] == 1:
+            masque_final[indices_zone] = 1
+            break
+            
+
+
+plt.imshow(masque_final, cmap='gray')
+plt.show()
