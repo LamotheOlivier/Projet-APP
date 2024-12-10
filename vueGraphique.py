@@ -21,6 +21,7 @@ class VueGrapique():
         self.nb_texture = nb_texture
 
         self.points = []
+        self.masque_chemin = np.zeros((self.height, self.width), dtype=np.uint8)
         self.masque = np.zeros((self.height * nb_texture, self.width * nb_texture), dtype=np.uint8)
 
         # Initialisation de la fenêtre principale
@@ -129,6 +130,7 @@ class VueGrapique():
         
         # Convertir l'image PIL en masque numpy
         chemin_masque = np.array(mask_image) // 255
+        self.masque_chemin = chemin_masque
 
         # Redimensionner le masque pour le masque de textures
         masque_redim = Image.fromarray(chemin_masque).resize((self.width * self.nb_texture, self.height * self.nb_texture), Image.NEAREST)
@@ -139,7 +141,7 @@ class VueGrapique():
         """
         Ouvre la fenêtre de validation du masque pour que l'utilisateur puisse le vérifier.
         """
-        mask_image = Image.fromarray(self.masque * 255)  # Convertir en image PIL
+        mask_image = Image.fromarray(self.masque_chemin * 255)  # Convertir en image PIL
         self.mask_photo = ImageTk.PhotoImage(mask_image)
 
         # Affichage du masque dans la fenêtre principale
@@ -163,6 +165,7 @@ class VueGrapique():
         self.message_label.destroy()
         # Fermer la fenêtre
         self.root.quit()
+        self.root.destroy()
 
 
     def tracer_chemin(self):
@@ -187,13 +190,11 @@ class VueGrapique():
         # Convertir l'image en masque binaire
         masque = np.array(image) // 255
 
-        # Créer un masque de textures
-        masque_textures = np.zeros((self.height * self.nb_texture, self.width * self.nb_texture), dtype=np.uint8)
-
-        # Remplir le masque de textures
-        for i in range(self.nb_texture):
-            for j in range(self.nb_texture):
-                masque_textures[i*self.height:(i+1)*self.height, j*self.width:(j+1)*self.width] = masque
+        # Créer le masque de textures
+        masque_textures = np.tile(masque, (self.nb_texture, self.nb_texture))
+        # for i in range(self.nb_texture):
+        #     for j in range(self.nb_texture):
+        #         masque_textures[i*self.height:(i+1)*self.height, j*self.width:(j+1)*self.width] = masque
         
         # # Test de l'affichage avec matplotlib
         # plt.imshow(masque_textures, cmap='gray')
@@ -206,24 +207,91 @@ class VueGrapique():
         """
         Applique le masque de textures sur le masque du chemin.
         """
+        # Récupérer les régions connectées du masque de textures
+        labeled_mask, num_labels = label(masque_textures)
+
+        # Créer le masque final
+        masque_final = np.zeros_like(masque_textures)
+
+        # Parcourir les régions connectées
+        for label_id in range(1, num_labels + 1):
+            # Récupérer les indices de la région
+            indices_zone = np.where(labeled_mask == label_id)
+
+            # Verifier si la région contient au moins un pixel du chemin
+            if np.any(self.masque[indices_zone] == 1):
+                masque_final[indices_zone] = 1
+        
+        #DEBUG Afficher le masque final
+        plt.imshow(masque_final, cmap='gray')
+        plt.show()
+
+        # Mettre à jour le masque
+        self.masque = masque_final
+
+
+
+    def appliquer_textures(self, texture_chemin, texture_fond):
+        """
+        Applique les textures sur l'image.
+        """
+        # Charger les textures
+        texture_chemin = Image.open(texture_chemin).convert("RGBA")
+        texture_fond = Image.open(texture_fond).convert("RGBA")
+
+        # Redimensionner les textures avec le nb de textures
+        texture_chemin = texture_chemin.resize((self.width, self.height), Image.NEAREST)
+        texture_fond = texture_fond.resize((self.width, self.height), Image.NEAREST)
+
+        # Convertir les textures en tableau numpy
+        texture_chemin = np.array(texture_chemin)
+        texture_fond = np.array(texture_fond)
+
+        # Redimensionner les textures
+        texture_chemin = np.tile(texture_chemin, (self.nb_texture, self.nb_texture, 1))
+        texture_fond = np.tile(texture_fond, (self.nb_texture, self.nb_texture, 1))
+
+        # Etendre le masque du chemin pour chaque canal
+        masque_final = np.expand_dims(self.masque, axis=-1)
+
+        # Appliquer les textures sur l'image pour chaque canal
+        image = masque_final * texture_chemin + (1 - masque_final) * texture_fond
+
+        # Créer une image PIL
+        image = Image.fromarray(image.astype(np.uint8))
+
+        # Afficher l'image
+        image.show()
+        return image
+    
+    def run(self):
+        print("Lancement de l'interface graphique")
+        self.tracer_chemin()
+        print("Chemin tracé")
+        masque_textures = self.charger_masque_textures("./Textures/texture3_masque.png")
+        print("Masque de textures chargé")
+        self.appliquer_masque_textures(masque_textures)
+        print("Textures appliquées")
+        self.appliquer_textures("./Textures/texture3.png", "./Textures/grass.png")
         
 
 # Exemple d'utilisation
 vue = VueGrapique()
-masque = vue.tracer_chemin()
-masque_textures = vue.charger_masque_textures("./Textures/texture3_masque.png")
-# masque_combine = masque * masque_textures
-labeled_mask, num_labels = label(masque_textures)
-masque_final = np.zeros_like(masque_textures)
+vue.run()
+# masque = vue.tracer_chemin()
+# masque_textures = vue.charger_masque_textures("./Textures/texture3_masque.png")
+# # masque_combine = masque * masque_textures
+# labeled_mask, num_labels = label(masque_textures)
+# masque_final = np.zeros_like(masque_textures)
 
-for label_id in range(1, num_labels + 1):
-    indices_zone = np.where(labeled_mask == label_id)
-    for i,j in zip(*indices_zone):
-        if masque[i,j] == 1:
-            masque_final[indices_zone] = 1
-            break
+# for label_id in range(1, num_labels + 1):
+#     indices_zone = np.where(labeled_mask == label_id)
+#     for i,j in zip(*indices_zone):
+#         if masque[i,j] == 1:
+#             masque_final[indices_zone] = 1
+#             break
             
 
 
-plt.imshow(masque_final, cmap='gray')
-plt.show()
+# plt.imshow(masque_final, cmap='gray')
+# plt.show()
