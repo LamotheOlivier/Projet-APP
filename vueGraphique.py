@@ -11,7 +11,7 @@ class VueGrapique():
     Classe qui permet à l'utilisateur de dessiner son chemin.
     """
 
-    def __init__(self, width=512, height=512, epaisseur_chemin=5, nb_texture=8):
+    def __init__(self, width=512, height=512, epaisseur_chemin=20, nb_texture=3):
         """
         Constructeur de la classe.
         """
@@ -192,13 +192,6 @@ class VueGrapique():
 
         # Créer le masque de textures
         masque_textures = np.tile(masque, (self.nb_texture, self.nb_texture))
-        # for i in range(self.nb_texture):
-        #     for j in range(self.nb_texture):
-        #         masque_textures[i*self.height:(i+1)*self.height, j*self.width:(j+1)*self.width] = masque
-        
-        # # Test de l'affichage avec matplotlib
-        # plt.imshow(masque_textures, cmap='gray')
-        # plt.show()
 
         return masque_textures
         
@@ -264,34 +257,17 @@ class VueGrapique():
         image.show()
         return image
     
-    def run(self):
+    def run(self, path_masque_texture, path_texture, path_fond):
         print("Lancement de l'interface graphique")
         self.tracer_chemin()
         print("Chemin tracé")
-        masque_textures = self.charger_masque_textures("./Textures/texture3_masque.png")
+        masque_textures = self.charger_masque_textures(path_masque_texture)
         print("Masque de textures chargé")
         self.appliquer_masque_textures(masque_textures)
         print("Textures appliquées")
-        self.appliquer_textures("./Textures/texture3.png", "./Textures/grass.png")
+        self.appliquer_textures(path_texture, path_fond)
         
 
 # Exemple d'utilisation
 vue = VueGrapique()
-vue.run()
-# masque = vue.tracer_chemin()
-# masque_textures = vue.charger_masque_textures("./Textures/texture3_masque.png")
-# # masque_combine = masque * masque_textures
-# labeled_mask, num_labels = label(masque_textures)
-# masque_final = np.zeros_like(masque_textures)
-
-# for label_id in range(1, num_labels + 1):
-#     indices_zone = np.where(labeled_mask == label_id)
-#     for i,j in zip(*indices_zone):
-#         if masque[i,j] == 1:
-#             masque_final[indices_zone] = 1
-#             break
-            
-
-
-# plt.imshow(masque_final, cmap='gray')
-# plt.show()
+vue.run("./Textures/texture11_masque.png", "./Textures/texture11.png", "./Textures/grass.png")
