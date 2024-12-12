@@ -1,14 +1,15 @@
 import cv2
 import numpy as np
 from utilities import *
-from sklearn.cluster import KMeans
+import matplotlib.pyplot as plt
+
 
 # Variables globales
 selected_points = []
 
 # Charger une image (ou une image vierge si aucune n'est disponible)
 texture_sol_base=cv2.imread('test_sol.jpg')
-texture_sol=np.tile(texture_sol_base, (3, 3, 1))
+texture_sol=np.tile(texture_sol_base, (2, 2, 1))
 print(texture_sol.shape)
 image = np.ones(texture_sol.shape, dtype=np.uint8) * 255  # Une image blanche
 cv2.putText(image, "Cliquez pour dessiner un chemin", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)
@@ -59,9 +60,8 @@ else:
     print("Pas assez de points sélectionnés pour interpoler un chemin.")
 
 # Charger les images
-image_chemin = image #cv2.imread('chemin.png', cv2.IMREAD_GRAYSCALE)
 # texture_sol = cv2.imread('texture7.png')
-image_path = 'texture_sol.png'  # Remplacez par le chemin de votre image
+image_path = 'texture10.png'  # Remplacez par le chemin de votre image
 pierre = cv2.imread(image_path)
 binary_pierre = apply_binary_segmentation(image_path)
 
@@ -70,11 +70,11 @@ segmented_texture = segment_texture_kmeans(pierre, n_clusters=2)
 #plt.imshow(segmented_texture)
 #plt.title("Segmentation par (KMean)")
 #plt.show()
-spacing = 200
+spacing = 160
 centers = get_path_centers(x_interp, y_interp, spacing)
 tangents = compute_tangents(x_interp, y_interp, centers)
 # Placer les pierres
-result_with_stones = place_textures(texture_sol, pierre, binary_pierre, centers, tangents, scale=0.4)
+result_with_stones = place_textures_with_overlap_check(texture_sol, pierre, binary_pierre, centers, tangents, scale=0.4)
 
 plt.imshow(result_with_stones)
 plt.title("Pierres placées sur le chemin")
